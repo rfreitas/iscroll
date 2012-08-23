@@ -2,6 +2,12 @@
  * iScroll v4.2 ~ Copyright (c) 2012 Matteo Spinelli, http://cubiq.org
  * Released under MIT license, http://cubiq.org/license
  */
+ /*
+	Modified by Ricardo Freitas to include an api that informs the scroller of how
+	much the wrapper is scaled (zoomed)
+	The iScroller already takes into account zooming, but only for the case that the
+	it was the iScroller itself that scaled the content
+ */
 (function(window, doc){
 var m = Math,
 	dummyStyle = doc.createElement('div').style,
@@ -101,7 +107,7 @@ var m = Math,
 			momentum: true,
 			lockDirection: true,
 			useTransform: true,
-			useTransition: false,
+			useTransition: true,//much smoother
 			topOffset: 0,
 			checkDOMChanges: false,		// Experimental
 			handleClick: true,
@@ -120,6 +126,10 @@ var m = Math,
 			zoomMax: 4,
 			doubleTapZoom: 2,
 			wheelAction: 'scroll',
+
+			// Scale (or zooming outside of the control of the iScroll)
+			scaleX: 1,
+			scaleY: 1,
 
 			// Snap
 			snap: false,
@@ -410,14 +420,20 @@ iScroll.prototype = {
 	},
 	
 	_move: function (e) {
+		console.log("moving");
+
+
 		var that = this,
 			point = hasTouch ? e.touches[0] : e,
-			deltaX = point.pageX - that.pointX,
-			deltaY = point.pageY - that.pointY,
+			deltaX = (point.pageX - that.pointX)*that.options.scaleX,
+			deltaY = (point.pageY - that.pointY)*that.options.scaleY,
 			newX = that.x + deltaX,
 			newY = that.y + deltaY,
 			c1, c2, scale,
 			timestamp = e.timeStamp || Date.now();
+
+		deltaX = deltaX*2;
+		deltaY = deltaY*2;
 
 		if (that.options.onBeforeScrollMove) that.options.onBeforeScrollMove.call(that, e);
 
