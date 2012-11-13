@@ -1,5 +1,5 @@
 /*!
- * iScroll v4.2 ~ Copyright (c) 2012 Matteo Spinelli, http://cubiq.org
+ * iScroll v4.2.5 ~ Copyright (c) 2012 Matteo Spinelli, http://cubiq.org
  * Released under MIT license, http://cubiq.org/license
  */
  /*
@@ -43,7 +43,7 @@ var m = Math,
 
     has3d = prefixStyle('perspective') in dummyStyle,
     hasTouch = 'ontouchstart' in window && !isTouchPad,
-    hasTransform = !!vendor,
+    hasTransform = vendor !== false,
     hasTransitionEnd = prefixStyle('transition') in dummyStyle,
 
 	RESIZE_EV = 'onorientationchange' in window ? 'orientationchange' : 'resize',
@@ -51,7 +51,6 @@ var m = Math,
 	MOVE_EV = hasTouch ? 'touchmove' : 'mousemove',
 	END_EV = hasTouch ? 'touchend' : 'mouseup',
 	CANCEL_EV = hasTouch ? 'touchcancel' : 'mouseup',
-	WHEEL_EV = vendor == 'Moz' ? 'DOMMouseScroll' : 'mousewheel',
 	TRNEND_EV = (function () {
 		if ( vendor === false ) return false;
 
@@ -59,7 +58,7 @@ var m = Math,
 				''			: 'transitionend',
 				'webkit'	: 'webkitTransitionEnd',
 				'Moz'		: 'transitionend',
-				'O'			: 'oTransitionEnd',
+				'O'			: 'otransitionend',
 				'ms'		: 'MSTransitionEnd'
 			};
 
@@ -187,9 +186,10 @@ var m = Math,
 		that._bind(RESIZE_EV, window);
 		that._bind(START_EV);
 		if (!hasTouch) {
-			that._bind('mouseout', that.wrapper);
-			if (that.options.wheelAction != 'none')
-				that._bind(WHEEL_EV);
+			if (that.options.wheelAction != 'none') {
+				that._bind('DOMMouseScroll');
+				that._bind('mousewheel');
+			}
 		}
 
 		if (that.options.checkDOMChanges) that.checkDOMTime = setInterval(function () {
@@ -220,8 +220,7 @@ iScroll.prototype = {
 			case END_EV:
 			case CANCEL_EV: that._end(e); break;
 			case RESIZE_EV: that._resize(); break;
-			case WHEEL_EV: that._wheel(e); break;
-			case 'mouseout': that._mouseout(e); break;
+			case 'DOMMouseScroll': case 'mousewheel': that._wheel(e); break;
 			case TRNEND_EV: that._transitionEnd(e); break;
 		}
 	},
@@ -387,11 +386,11 @@ iScroll.prototype = {
 			if (that.options.useTransform) {
 				// Very lame general purpose alternative to CSSMatrix
 				matrix = getComputedStyle(that.scroller, null)[transform].replace(/[^0-9\-.,]/g, '').split(',');
-				x = matrix[4] * 1;
-				y = matrix[5] * 1;
+				x = +(matrix[12] || matrix[4]);
+				y = +(matrix[13] || matrix[5]);
 			} else {
-				x = getComputedStyle(that.scroller, null).left.replace(/[^0-9-]/g, '') * 1;
-				y = getComputedStyle(that.scroller, null).top.replace(/[^0-9-]/g, '') * 1;
+				x = +getComputedStyle(that.scroller, null).left.replace(/[^0-9-]/g, '');
+				y = +getComputedStyle(that.scroller, null).top.replace(/[^0-9-]/g, '');
 			}
 			
 			if (x != that.x || y != that.y) {
@@ -399,6 +398,7 @@ iScroll.prototype = {
 				else cancelFrame(that.aniTime);
 				that.steps = [];
 				that._pos(x, y);
+				if (that.options.onScrollEnd) that.options.onScrollEnd.call(that);
 			}
 		}
 
@@ -414,9 +414,9 @@ iScroll.prototype = {
 
 		if (that.options.onScrollStart) that.options.onScrollStart.call(that, e);
 
-		that._bind(MOVE_EV);
-		that._bind(END_EV);
-		that._bind(CANCEL_EV);
+		that._bind(MOVE_EV, window);
+		that._bind(END_EV, window);
+		that._bind(CANCEL_EV, window);
 	},
 	
 	_move: function (e) {
@@ -522,9 +522,9 @@ iScroll.prototype = {
 			snap,
 			scale;
 
-		that._unbind(MOVE_EV);
-		that._unbind(END_EV);
-		that._unbind(CANCEL_EV);
+		that._unbind(MOVE_EV, window);
+		that._unbind(END_EV, window);
+		that._unbind(CANCEL_EV, window);
 
 		if (that.options.onBeforeScrollEnd) that.options.onBeforeScrollEnd.call(that, e);
 
@@ -582,7 +582,7 @@ iScroll.prototype = {
 				}
 			}
 
-			that._resetPos(200);
+			that._resetPos(400);
 
 			if (that.options.onTouchEnd) that.options.onTouchEnd.call(that, e);
 			return;
@@ -716,19 +716,6 @@ iScroll.prototype = {
 		}
 	},
 	
-	_mouseout: function (e) {
-		var t = e.relatedTarget;
-
-		if (!t) {
-			this._end(e);
-			return;
-		}
-
-		while (t = t.parentNode) if (t == this.wrapper) return;
-		
-		this._end(e);
-	},
-
 	_transitionEnd: function (e) {
 		var that = this;
 
@@ -915,13 +902,13 @@ iScroll.prototype = {
 		// Remove the event listeners
 		that._unbind(RESIZE_EV, window);
 		that._unbind(START_EV);
-		that._unbind(MOVE_EV);
-		that._unbind(END_EV);
-		that._unbind(CANCEL_EV);
+		that._unbind(MOVE_EV, window);
+		that._unbind(END_EV, window);
+		that._unbind(CANCEL_EV, window);
 		
 		if (!that.options.hasTouch) {
-			that._unbind('mouseout', that.wrapper);
-			that._unbind(WHEEL_EV);
+			that._unbind('DOMMouseScroll');
+			that._unbind('mousewheel');
 		}
 		
 		if (that.options.useTransition) that._unbind(TRNEND_EV);
@@ -1001,7 +988,7 @@ iScroll.prototype = {
 
 		if (!that.zoomed) {
 			that.scroller.style[transitionDuration] = '0';
-			that._resetPos(200);
+			that._resetPos(400);
 		}
 	},
 
@@ -1072,9 +1059,9 @@ iScroll.prototype = {
 		this.enabled = false;
 
 		// If disabled after touchstart we make sure that there are no left over events
-		this._unbind(MOVE_EV);
-		this._unbind(END_EV);
-		this._unbind(CANCEL_EV);
+		this._unbind(MOVE_EV, window);
+		this._unbind(END_EV, window);
+		this._unbind(CANCEL_EV, window);
 	},
 	
 	enable: function () {
